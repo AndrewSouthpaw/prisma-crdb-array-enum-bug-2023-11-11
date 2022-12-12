@@ -1,4 +1,4 @@
-Demonstrates issue with Prisma generating migration that is incompatible with CRDB.
+Demonstrates issue with Prisma generating migration that is incompatible with CRDB. Related ticket: https://support.cockroachlabs.com/hc/en-us/requests/14983?page=1
 
 # Setup
 
