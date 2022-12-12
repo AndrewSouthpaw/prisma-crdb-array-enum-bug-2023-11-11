@@ -26,3 +26,7 @@ DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E55000
 ```
 
 Then change to running v22.1.11 with a fresh DB. Run `npx prisma migrate dev` and now it'll work.
+
+# Discussion
+
+The problematic migration is here: https://github.com/AndrewSouthpaw/crdb-prisma-migration-repro-2022-12-12/commit/e69b1e590c8fc5645113072482d76af86bf5cb08. If you change a column `Int` -> `BigInt` it'll create a migration file that is incompatible with CRDB.
