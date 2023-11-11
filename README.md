@@ -1,32 +1,47 @@
-Demonstrates issue with Prisma generating migration that is incompatible with CRDB. Related ticket: https://support.cockroachlabs.com/hc/en-us/requests/14983?page=1
+Demonstrates issue with Prisma generating SQL that fails to create a simple record with an enum array after running `TRUNCATE`.
+
+If you create a record that has an enum array column, then run `TRUNCATE`, then create another record, it produces an error.
+
+This is using the `TRUNCATE` code [recommended by Prisma for clearing test data](https://www.prisma.io/docs/concepts/components/prisma-client/crud#deleting-all-data-with-raw-sql--truncate).
 
 # Setup
 
 1. `npm install`
-1. Have CRDB v22.2 running on port 26257
-1. `npx prisma migrate dev`
+1. Have CRDB v22 or v23 running on port 26257
+1. `$ DATABASE_URL="postgresql://root@localhost:26257/defaultdb" npx prisma migrate dev`
+1. `$ DATABASE_URL="postgresql://root@localhost:26257/defaultdb" npx jest`
+1. (you might have to run jest twice to get the error, unclear)
 1. 💥
 
 Should get this error:
 
 ```
-Applying migration `20221212204348_breaking_migration`
-Error: P3018
+ FAIL  ./index.test.ts
+  ✕ breaks when using array enum type and truncate (315 ms)
 
-A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve
+  ● breaks when using array enum type and truncate
 
-Migration name: 20221212204348_breaking_migration
+    PrismaClientUnknownRequestError:
+    Invalid `prisma.test.create()` invocation in
+    /Users/andrew/Projects/crdb-prisma-migration-repro-2022-12-12/index.test.ts:26:21
 
-Database error code: 55000
+      23 it("breaks when using array enum type and truncate", async () => {
+      24   await prisma.test.create({ data: { colors: ['blue'] }, });
+      25   await resetData();
+    → 26   await prisma.test.create(
+    Error occurred during query execution:
+    ConnectorError(ConnectorError { user_facing_error: None, kind: QueryError(PostgresError { code: "42804", message: "placeholder $1 already has type string, cannot assign Color", severity: "ERROR", detail: None, column: None, hint: None }), transient: false })
 
-Database error:
-ERROR: column "balance" being dropped, try again later
-
-DbError { severity: "ERROR", parsed_severity: Some(Error), code: SqlState(E55000), message: "column \"balance\" being dropped, try again later", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("add_column.go"), line: Some(244), routine: Some("checkColumnDoesNotExist") }
+      at Cn.handleRequestError (node_modules/@prisma/client/runtime/library.js:123:6989)
+      at Cn.handleAndLogRequestError (node_modules/@prisma/client/runtime/library.js:123:6206)
+      at Cn.request (node_modules/@prisma/client/runtime/library.js:123:5926)
+      at l (node_modules/@prisma/client/runtime/library.js:128:9968)
 ```
 
-Then change to running v22.1.11 with a fresh DB. Run `npx prisma migrate dev` and now it'll work.
+Test code is in `index.test.ts`.
+
+If you comment out `await resetData()`, the error goes away. Rather strangely, if you add the reset back in, you have to run the test **twice** to produce the error.
 
 # Discussion
 
-The problematic migration is here: https://github.com/AndrewSouthpaw/crdb-prisma-migration-repro-2022-12-12/commit/e69b1e590c8fc5645113072482d76af86bf5cb08. If you change a column `Int` -> `BigInt` it'll create a migration file that is incompatible with CRDB.
+I also tried this with a regular enum column (e.g. `color Color`), but it doesn't reproduce the issue.
